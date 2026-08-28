@@ -2,10 +2,15 @@
 //
 // Loads the sentence list from data/sentences.json -- an array of
 // { "ru": "...", "en": "..." } pairs -- and drives the listening
-// exercise. Every tap of "Listen" makes a fresh request to the backend,
-// which generates the MP3 live and streams it back. Nothing is cached
-// or written anywhere -- the audio blob is used once and then discarded
-// (its object URL is revoked right after).
+// exercise.
+//
+// Voice: each sentence gets ONE randomly-picked voice (Dmitry or
+// Svetlana) the first time it's played. That choice -- and the
+// generated audio itself -- is cached in memory for the rest of the
+// session, so replaying the same card (even 3-4 times) never calls the
+// backend again. Moving to a different card and back still uses the
+// cached audio. Nothing persists after a page reload -- it's a plain
+// in-memory cache, not storage.
 
 const els = {
   listenBtn: document.getElementById("listen-btn"),
@@ -18,30 +23,43 @@ const els = {
   progressLabel: document.getElementById("progress-label"),
   progressFill: document.getElementById("progress-fill"),
   voiceLabel: document.getElementById("voice-label"),
-  btnDmitry: document.getElementById("btn-dmitry"),
-  btnSvetlana: document.getElementById("btn-svetlana"),
   statusLine: document.getElementById("status-line"),
 };
 
 const STORAGE_KEY_INDEX = "ru_listening_index";
-const STORAGE_KEY_VOICE = "ru_listening_voice";
+const VOICES = ["dmitry", "svetlana"];
 
 let sentences = [];
 let currentIndex = 0;
-let currentVoice = localStorage.getItem(STORAGE_KEY_VOICE) || "svetlana";
 let revealed = false;
-let currentObjectUrl = null;
+
+// In-memory cache, cleared on page reload.
+// cardCache[index] = { voice: "dmitry" | "svetlana", blobs: { normal: Blob, slow: Blob } }
+const cardCache = {};
+
+function pickRandomVoice() {
+  return VOICES[Math.floor(Math.random() * VOICES.length)];
+}
+
+function getOrCreateCacheEntry(index) {
+  if (!cardCache[index]) {
+    cardCache[index] = { voice: pickRandomVoice(), blobs: {} };
+  }
+  return cardCache[index];
+}
 
 function setStatus(message, isError = false) {
   els.statusLine.textContent = message || "";
   els.statusLine.classList.toggle("error", isError);
 }
 
-function updateVoiceUI() {
-  els.btnDmitry.classList.toggle("active", currentVoice === "dmitry");
-  els.btnSvetlana.classList.toggle("active", currentVoice === "svetlana");
-  els.voiceLabel.textContent = currentVoice === "dmitry" ? "Dmitry" : "Svetlana";
-  localStorage.setItem(STORAGE_KEY_VOICE, currentVoice);
+function updateVoiceLabel() {
+  const entry = cardCache[currentIndex];
+  if (entry) {
+    els.voiceLabel.textContent = entry.voice === "dmitry" ? "🎙️ Dmitry" : "🎙️ Svetlana";
+  } else {
+    els.voiceLabel.textContent = "";
+  }
 }
 
 function updateProgressUI() {
@@ -81,6 +99,7 @@ function goToIndex(newIndex) {
   localStorage.setItem(STORAGE_KEY_INDEX, String(currentIndex));
   updateProgressUI();
   updateRevealUI();
+  updateVoiceLabel();
   setStatus("");
 }
 
@@ -108,16 +127,43 @@ async function loadSentences() {
 
     updateProgressUI();
     updateRevealUI();
+    updateVoiceLabel();
   } catch (err) {
     console.error(err);
-    setStatus("Could not load sentences.txt — check the file exists and you're serving over http(s).", true);
+    setStatus("Could not load sentences.json — check the file exists and you're serving over http(s).", true);
   }
 }
 
+function playBlob(blob) {
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.addEventListener("ended", () => URL.revokeObjectURL(url));
+  audio.addEventListener("error", () => URL.revokeObjectURL(url));
+  return audio.play();
+}
+
 async function fetchAndPlay(slow = false) {
-  const current = sentences[currentIndex];
+  const idx = currentIndex;
+  const current = sentences[idx];
   if (!current) return;
-  const text = current.ru;
+
+  const entry = getOrCreateCacheEntry(idx);
+  updateVoiceLabel();
+
+  const cacheKey = slow ? "slow" : "normal";
+  const cachedBlob = entry.blobs[cacheKey];
+
+  if (cachedBlob) {
+    // Already generated for this card -- just replay it, no network call.
+    try {
+      setStatus("");
+      await playBlob(cachedBlob);
+    } catch (err) {
+      console.error(err);
+      setStatus("Couldn't play the cached audio.", true);
+    }
+    return;
+  }
 
   els.listenBtn.classList.add("loading");
   els.listenBtn.disabled = true;
@@ -125,8 +171,8 @@ async function fetchAndPlay(slow = false) {
 
   try {
     const params = new URLSearchParams({
-      text,
-      voice: currentVoice,
+      text: current.ru,
+      voice: entry.voice,
       slow: slow ? "1" : "0",
     });
     const url = `${BACKEND_URL}/api/speak?${params.toString()}`;
@@ -138,25 +184,10 @@ async function fetchAndPlay(slow = false) {
     }
 
     const blob = await res.blob();
-
-    // Clean up any previous object URL before creating a new one.
-    if (currentObjectUrl) {
-      URL.revokeObjectURL(currentObjectUrl);
-      currentObjectUrl = null;
-    }
-
-    currentObjectUrl = URL.createObjectURL(blob);
-    const audio = new Audio(currentObjectUrl);
-
-    audio.addEventListener("ended", () => {
-      if (currentObjectUrl) {
-        URL.revokeObjectURL(currentObjectUrl);
-        currentObjectUrl = null;
-      }
-    });
+    entry.blobs[cacheKey] = blob; // cache for next time -- no re-generation needed
 
     setStatus("");
-    await audio.play();
+    await playBlob(blob);
   } catch (err) {
     console.error(err);
     setStatus(
@@ -183,16 +214,6 @@ els.revealBtn.addEventListener("click", () => {
 els.nextBtn.addEventListener("click", () => goToIndex(currentIndex + 1));
 els.prevBtn.addEventListener("click", () => goToIndex(currentIndex - 1));
 
-els.btnDmitry.addEventListener("click", () => {
-  currentVoice = "dmitry";
-  updateVoiceUI();
-});
-els.btnSvetlana.addEventListener("click", () => {
-  currentVoice = "svetlana";
-  updateVoiceUI();
-});
-
 // ---------- Init ----------
 
-updateVoiceUI();
 loadSentences();
