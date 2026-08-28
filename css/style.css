@@ -284,12 +284,31 @@ a {
   color: white;
 }
 
-.listen-zone {
+.listen-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 16px;
   padding: 10px 0 4px;
+}
+
+.slower-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg-soft);
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--border);
+}
+
+.slower-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--border);
 }
 
 .listen-btn {
@@ -347,6 +366,12 @@ a {
   padding: 16px;
   text-align: center;
   gap: 6px;
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+
+.reveal-box:active {
+  transform: scale(0.98);
 }
 
 .reveal-box.hidden-text {
@@ -368,13 +393,6 @@ a {
   font-weight: 600;
   color: var(--blue-dark);
   font-style: italic;
-}
-
-.secondary-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  width: 100%;
 }
 
 .pill-btn {
@@ -642,48 +660,6 @@ a {
   color: var(--red-dark);
   border-color: var(--red);
   transform: rotate(8deg);
-}
-
-/* ---------- Judge buttons (swipe fallback) ---------- */
-
-.judge-row {
-  display: flex;
-  justify-content: center;
-  gap: 28px;
-  margin-top: 18px;
-}
-
-.judge-btn {
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
-  border: none;
-  font-size: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.again-btn {
-  background: #ffe4e4;
-  box-shadow: 0 6px 0 #ffc2c2;
-}
-
-.again-btn:active {
-  transform: translateY(4px);
-  box-shadow: 0 2px 0 #ffc2c2;
-}
-
-.know-btn {
-  background: var(--green-soft);
-  box-shadow: 0 6px 0 #b8f088;
-}
-
-.know-btn:active {
-  transform: translateY(4px);
-  box-shadow: 0 2px 0 #b8f088;
 }
 
 /* ---------- Session complete screen ---------- */
