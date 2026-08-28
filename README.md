@@ -14,7 +14,7 @@ each tap, never stored.
 
 - **Frontend** (`index.html`, `exercises/`, `css/`, `js/`): a static
   site you host for free on GitHub Pages. Reads sentences from
-  `data/sentences.txt` (one Russian sentence per line).
+  `data/sentences.json` -- an array of `{ "ru": "...", "en": "..." }` pairs.
 - **Backend** (`backend/server.py`): a tiny Flask app with one endpoint,
   `/api/speak`, that calls `edge-tts` and streams the MP3 straight back.
   No files are ever written to disk. Deploy it for free — see
@@ -32,7 +32,7 @@ each tap, never stored.
 │   ├── config.js           # Set your backend URL here
 │   └── listening.js        # Listening exercise logic
 ├── data/
-│   └── sentences.txt       # Your sentences, one per line (replace this!)
+│   └── sentences.json      # Your Russian/English sentence pairs (replace this!)
 ├── backend/
 │   ├── server.py           # Flask app: generates + streams TTS live
 │   └── requirements.txt
@@ -42,9 +42,15 @@ each tap, never stored.
 
 ## Getting started
 
-1. Replace `data/sentences.txt` with your own sentences (one per line —
-   only ever *append* new ones, don't reorder/delete, so your place in
-   the list stays meaningful across sessions).
+1. Replace `data/sentences.json` with your own sentence pairs, e.g.:
+   ```json
+   [
+     { "ru": "Собака ест дома.", "en": "The dog is eating at home." },
+     { "ru": "Кошка спит на диване.", "en": "The cat is sleeping on the sofa." }
+   ]
+   ```
+   Only ever *append* new entries to the end -- reordering shifts your
+   saved progress (which is stored by index in your browser).
 2. Deploy the backend — see [`DEPLOY.md`](./DEPLOY.md) (takes ~5 minutes
    on Render's free tier).
 3. Set `BACKEND_URL` in `js/config.js` to your deployed backend's URL.

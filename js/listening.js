@@ -1,10 +1,11 @@
 // listening.js
 //
-// Loads the sentence list (data/sentences.txt, one sentence per line) and
-// drives the listening exercise. Every tap of "Listen" makes a fresh
-// request to the backend, which generates the MP3 live and streams it
-// back. Nothing is cached or written anywhere -- the audio blob is used
-// once and then discarded (its object URL is revoked right after).
+// Loads the sentence list from data/sentences.json -- an array of
+// { "ru": "...", "en": "..." } pairs -- and drives the listening
+// exercise. Every tap of "Listen" makes a fresh request to the backend,
+// which generates the MP3 live and streams it back. Nothing is cached
+// or written anywhere -- the audio blob is used once and then discarded
+// (its object URL is revoked right after).
 
 const els = {
   listenBtn: document.getElementById("listen-btn"),
@@ -51,9 +52,21 @@ function updateProgressUI() {
 }
 
 function updateRevealUI() {
-  if (revealed) {
-    els.revealBox.textContent = sentences[currentIndex] || "";
+  const current = sentences[currentIndex];
+  if (revealed && current) {
+    els.revealBox.innerHTML = "";
     els.revealBox.classList.remove("hidden-text");
+
+    const ruLine = document.createElement("div");
+    ruLine.className = "reveal-ru";
+    ruLine.textContent = current.ru;
+
+    const enLine = document.createElement("div");
+    enLine.className = "reveal-en";
+    enLine.textContent = current.en;
+
+    els.revealBox.appendChild(ruLine);
+    els.revealBox.appendChild(enLine);
   } else {
     els.revealBox.textContent = 'Text hidden — tap "Show text" to reveal';
     els.revealBox.classList.add("hidden-text");
@@ -73,16 +86,20 @@ function goToIndex(newIndex) {
 
 async function loadSentences() {
   try {
-    const res = await fetch("../data/sentences.txt", { cache: "no-store" });
-    if (!res.ok) throw new Error(`Failed to load sentences.txt (${res.status})`);
-    const text = await res.text();
-    sentences = text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+    const res = await fetch("../data/sentences.json", { cache: "no-store" });
+    if (!res.ok) throw new Error(`Failed to load sentences.json (${res.status})`);
+    const data = await res.json();
+
+    if (!Array.isArray(data)) {
+      throw new Error("sentences.json must be a JSON array of { ru, en } objects");
+    }
+
+    sentences = data
+      .filter((item) => item && typeof item.ru === "string" && item.ru.trim().length > 0)
+      .map((item) => ({ ru: item.ru.trim(), en: (item.en || "").trim() }));
 
     if (sentences.length === 0) {
-      setStatus("No sentences found in data/sentences.txt", true);
+      setStatus("No sentences found in data/sentences.json", true);
       return;
     }
 
@@ -98,8 +115,9 @@ async function loadSentences() {
 }
 
 async function fetchAndPlay(slow = false) {
-  const text = sentences[currentIndex];
-  if (!text) return;
+  const current = sentences[currentIndex];
+  if (!current) return;
+  const text = current.ru;
 
   els.listenBtn.classList.add("loading");
   els.listenBtn.disabled = true;
