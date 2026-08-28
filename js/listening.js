@@ -25,12 +25,7 @@ const els = {
   listenBtn: document.getElementById("listen-btn"),
   listenHint: document.getElementById("listen-hint"),
   slowerBtn: document.getElementById("slower-btn"),
-  revealBtn: document.getElementById("reveal-btn"),
   revealBox: document.getElementById("reveal-box"),
-
-  judgeRow: document.getElementById("judge-row"),
-  againBtn: document.getElementById("again-btn"),
-  knowBtn: document.getElementById("know-btn"),
 
   statusLine: document.getElementById("status-line"),
 
@@ -120,7 +115,7 @@ function renderRevealUI() {
     els.revealBox.appendChild(ruLine);
     els.revealBox.appendChild(enLine);
   } else {
-    els.revealBox.textContent = 'Text hidden — tap "Show text" to reveal';
+    els.revealBox.textContent = "Tap to reveal";
     els.revealBox.classList.add("hidden-text");
   }
 }
@@ -144,11 +139,9 @@ function showCard() {
   }
 
   els.deck.style.display = "";
-  els.judgeRow.style.display = "";
   els.completeScreen.style.display = "none";
 
   revealed = false;
-  els.revealBtn.textContent = "👁️ Show text";
   renderRevealUI();
   resetCardTransform();
   setStatus("");
@@ -157,7 +150,6 @@ function showCard() {
 
 function showCompleteScreen() {
   els.deck.style.display = "none";
-  els.judgeRow.style.display = "none";
   els.completeScreen.style.display = "flex";
 
   const session = RuProgress.getSession();
@@ -298,8 +290,9 @@ function commitSwipe(knewIt) {
 let dragState = null;
 
 function onPointerDown(e) {
-  // Don't start a drag from interactive controls inside the card.
-  if (e.target.closest("button")) return;
+  // Don't start a drag from interactive controls inside the card
+  // (buttons, or the tap-to-reveal box).
+  if (e.target.closest("button") || e.target.closest("#reveal-box")) return;
   dragState = {
     startX: e.clientX,
     startY: e.clientY,
@@ -355,14 +348,10 @@ function onPointerUp(e) {
 els.listenBtn.addEventListener("click", () => fetchAndPlay(false));
 els.slowerBtn.addEventListener("click", () => fetchAndPlay(true));
 
-els.revealBtn.addEventListener("click", () => {
+els.revealBox.addEventListener("click", () => {
   revealed = !revealed;
-  els.revealBtn.textContent = revealed ? "🙈 Hide text" : "👁️ Show text";
   renderRevealUI();
 });
-
-els.knowBtn.addEventListener("click", () => commitSwipe(true));
-els.againBtn.addEventListener("click", () => commitSwipe(false));
 
 els.swipeCard.addEventListener("pointerdown", onPointerDown);
 els.swipeCard.addEventListener("pointermove", onPointerMove);
