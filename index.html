@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Russian Practice</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div class="app-header">
+      <div class="logo-mark">🇷🇺</div>
+      <div>
+        <h1>Russian Practice</h1>
+        <div class="subtitle">Pick an exercise</div>
+      </div>
+    </div>
+
+    <div class="exercise-list">
+      <a class="exercise-card available" href="exercises/listening.html">
+        <div class="exercise-icon">🎧</div>
+        <div class="exercise-info">
+          <h3>Listening Practice</h3>
+          <p>Hear a sentence, guess it, reveal the text.</p>
+        </div>
+        <div class="chevron">›</div>
+      </a>
+
+      <div class="exercise-card disabled">
+        <div class="exercise-icon">✍️</div>
+        <div class="exercise-info">
+          <h3>Dictation</h3>
+          <p>Listen and type what you hear.</p>
+        </div>
+        <div class="exercise-badge soon">Soon</div>
+      </div>
+
+      <div class="exercise-card disabled">
+        <div class="exercise-icon">🗣️</div>
+        <div class="exercise-info">
+          <h3>Shadowing</h3>
+          <p>Repeat sentences out loud after the voice.</p>
+        </div>
+        <div class="exercise-badge soon">Soon</div>
+      </div>
+
+      <div class="exercise-card disabled">
+        <div class="exercise-icon">🃏</div>
+        <div class="exercise-info">
+          <h3>Vocabulary Flashcards</h3>
+          <p>Review your 600+ words with spaced repetition.</p>
+        </div>
+        <div class="exercise-badge soon">Soon</div>
+      </div>
+    </div>
+
+    <div class="settings-note">
+      Audio is generated live by a small backend and never stored.<br />
+      Backend URL is set in <code>js/config.js</code>.
+    </div>
+  </div>
+</body>
+</html>

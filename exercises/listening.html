@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Listening Practice — Russian</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div class="app-header">
+      <a class="back-btn" href="../index.html">←</a>
+      <div>
+        <h1>Listening Practice</h1>
+        <div class="subtitle">Listen, guess, reveal</div>
+      </div>
+    </div>
+
+    <div class="practice-card">
+      <div class="progress-row">
+        <span id="progress-label">1 / 100</span>
+        <span id="voice-label">Svetlana</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-fill" style="width: 1%;"></div>
+      </div>
+
+      <div class="voice-toggle">
+        <button id="btn-dmitry" data-voice="dmitry">Dmitry</button>
+        <button id="btn-svetlana" data-voice="svetlana" class="active">Svetlana</button>
+      </div>
+
+      <div class="listen-zone">
+        <button class="listen-btn" id="listen-btn" aria-label="Listen">🔊</button>
+        <div class="listen-hint" id="listen-hint">Tap to hear the sentence</div>
+      </div>
+
+      <div class="reveal-box hidden-text" id="reveal-box">Text hidden — tap "Show text" to reveal</div>
+
+      <div class="secondary-controls">
+        <button class="pill-btn" id="slower-btn">🐢 Slower</button>
+        <button class="pill-btn" id="reveal-btn">👁️ Show text</button>
+      </div>
+
+      <div class="nav-row">
+        <button class="prev-btn" id="prev-btn">‹ Prev</button>
+        <button class="next-btn" id="next-btn">Next ›</button>
+      </div>
+
+      <div class="status-line" id="status-line"></div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/listening.js"></script>
+</body>
+</html>
