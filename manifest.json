@@ -1,0 +1,22 @@
+{
+  "name": "Russian Learner App",
+  "short_name": "Russian Learner",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0c0908",
+  "theme_color": "#0c0908",
+  "icons": [
+    {
+      "src": "/imgs/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/imgs/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
