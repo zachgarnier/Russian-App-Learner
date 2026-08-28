@@ -9,4 +9,4 @@
 // After deploying (e.g. to Render.com), replace it with your live URL:
 //     const BACKEND_URL = "https://your-app-name.onrender.com";
 
-const BACKEND_URL = "http://localhost:5000";
+const BACKEND_URL = "https://russian-tts-backend.onrender.com";
