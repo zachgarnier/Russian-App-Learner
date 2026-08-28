@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Listening Practice — Russian</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -15,41 +15,88 @@
       <a class="back-btn" href="../index.html">←</a>
       <div>
         <h1>Listening Practice</h1>
-        <div class="subtitle">Listen, guess, reveal</div>
+        <div class="subtitle" id="streak-label">🔥 0 day streak</div>
       </div>
     </div>
 
-    <div class="practice-card">
-      <div class="progress-row">
-        <span id="progress-label">1 / 100</span>
-        <span id="voice-label"></span>
+    <div class="stats-row">
+      <div class="ring-wrap">
+        <svg class="progress-ring" viewBox="0 0 80 80">
+          <circle class="ring-track" cx="40" cy="40" r="34"></circle>
+          <circle class="ring-fill" id="ring-fill" cx="40" cy="40" r="34"></circle>
+        </svg>
+        <div class="ring-label">
+          <span id="ring-count">0</span>
+          <small>/ <span id="ring-target">20</span></small>
+        </div>
       </div>
-      <div class="progress-bar-track">
-        <div class="progress-bar-fill" id="progress-fill" style="width: 1%;"></div>
+      <div class="stats-side">
+        <div class="stats-title">Today's goal</div>
+        <div class="overall-bar-track">
+          <div class="overall-bar-fill" id="overall-fill" style="width: 0%;"></div>
+        </div>
+        <div class="overall-label" id="overall-label">0 / 0 mastered</div>
+      </div>
+    </div>
+
+    <!-- Swipe deck -->
+    <div class="deck" id="deck">
+      <div class="ghost-card ghost-2"></div>
+      <div class="ghost-card ghost-1"></div>
+
+      <div class="swipe-card" id="swipe-card">
+        <div class="swipe-overlay know" id="overlay-know">KNOW IT</div>
+        <div class="swipe-overlay again" id="overlay-again">AGAIN</div>
+
+        <div class="listen-zone">
+          <button class="listen-btn" id="listen-btn" aria-label="Listen">🔊</button>
+          <div class="listen-hint" id="listen-hint">Tap to hear, then swipe</div>
+        </div>
+
+        <div class="reveal-box hidden-text" id="reveal-box">Text hidden — tap "Show text" to reveal</div>
+
+        <div class="secondary-controls">
+          <button class="pill-btn" id="slower-btn">🐢 Slower</button>
+          <button class="pill-btn" id="reveal-btn">👁️ Show text</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="judge-row" id="judge-row">
+      <button class="judge-btn again-btn" id="again-btn" aria-label="Again">✖️</button>
+      <button class="judge-btn know-btn" id="know-btn" aria-label="I know it">✅</button>
+    </div>
+
+    <div class="status-line" id="status-line"></div>
+
+    <!-- Session complete screen -->
+    <div class="complete-screen" id="complete-screen" style="display: none;">
+      <div class="complete-emoji">🎉</div>
+      <h2>Session complete!</h2>
+      <p id="complete-summary">You got 20 sentences today.</p>
+
+      <div class="complete-stats">
+        <div class="complete-stat">
+          <div class="complete-stat-value" id="complete-streak">0</div>
+          <div class="complete-stat-label">🔥 streak</div>
+        </div>
+        <div class="complete-stat">
+          <div class="complete-stat-value" id="complete-mastered">0</div>
+          <div class="complete-stat-label">mastered</div>
+        </div>
+        <div class="complete-stat">
+          <div class="complete-stat-value" id="complete-pct">0%</div>
+          <div class="complete-stat-label">of 10,000</div>
+        </div>
       </div>
 
-      <div class="listen-zone">
-        <button class="listen-btn" id="listen-btn" aria-label="Listen">🔊</button>
-        <div class="listen-hint" id="listen-hint">Tap to hear the sentence</div>
-      </div>
-
-      <div class="reveal-box hidden-text" id="reveal-box">Text hidden — tap "Show text" to reveal</div>
-
-      <div class="secondary-controls">
-        <button class="pill-btn" id="slower-btn">🐢 Slower</button>
-        <button class="pill-btn" id="reveal-btn">👁️ Show text</button>
-      </div>
-
-      <div class="nav-row">
-        <button class="prev-btn" id="prev-btn">‹ Prev</button>
-        <button class="next-btn" id="next-btn">Next ›</button>
-      </div>
-
-      <div class="status-line" id="status-line"></div>
+      <button class="pill-btn wide bonus-btn" id="bonus-btn">➕ Bonus round (+10)</button>
+      <a class="nav-row-link" href="../index.html">Done for today</a>
     </div>
   </div>
 
   <script src="../js/config.js"></script>
+  <script src="../js/progress.js"></script>
   <script src="../js/listening.js"></script>
 </body>
 </html>

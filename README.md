@@ -60,12 +60,31 @@ each tap, never stored.
 
 ## The listening exercise
 
-- 🔊 **Listen** — generates and plays the current sentence
-- 🐢 **Slower** — same sentence at reduced speed
-- 👁️ **Show text** — reveals the Cyrillic sentence to check yourself
-- **Dmitry / Svetlana** toggle — switch voices anytime
-- **Next / Prev** — move through your list; progress is saved locally
-  in your browser so you can pick up where you left off
+This isn't a flat "1 / 10,000" list — it's built around **spaced
+repetition** so you can actually work through a large sentence bank
+without it feeling endless:
+
+- **Swipe right** ("I know it") or **swipe left** ("Again") on each
+  card — or use the ✅ / ✖️ buttons if you're on desktop. Swiping right
+  sends the sentence further out on a review schedule (1, 2, 4, 8, 16,
+  then 30 days). Swiping left brings it back soon, sometimes even later
+  in the *same* session.
+- **Daily goal**: a ring shows today's progress (e.g. 12/20). Only
+  right-swipes count toward it, so you can't pad the number by
+  swiping left through everything.
+- **Streak**: a 🔥 counter for consecutive days practiced.
+- **Overall progress**: a slim bar showing how many of your 10,000 (or
+  however many) sentences are fully "mastered" — de-emphasized on
+  purpose so the big number doesn't feel discouraging day to day.
+- **Session complete screen**: once you hit today's goal, a small
+  celebration with stats and an optional "bonus round" (+10 more).
+- 🔊 **Listen** / 🐢 **Slower** / 👁️ **Show text** work as before.
+
+All of this progress (per-sentence review schedule, streak, daily
+session state) is stored in your browser's `localStorage` — no
+account, single device, nothing sent anywhere. See `js/progress.js` for
+the full spaced-repetition logic if you want to tweak the intervals,
+daily goal size, or requeue behavior.
 
 ## Adding more exercises later
 
