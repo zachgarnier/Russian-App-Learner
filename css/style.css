@@ -736,3 +736,120 @@ a {
   color: var(--text-dim);
   text-decoration: underline;
 }
+
+/* ---------- Hands-free / Bluetooth remote mode ---------- */
+
+.hf-progress {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.hf-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 10px 4px 20px;
+  text-align: center;
+}
+
+.hf-orb {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  border: 3px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3.2rem;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.hf-orb.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  transform: scale(1.05);
+}
+
+.hf-status {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+  min-height: 1.3em;
+}
+
+.hf-substatus {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-top: -10px;
+}
+
+.hf-start-btn {
+  font-size: 1.05rem;
+  padding: 16px 22px;
+  background: var(--blue);
+  border-bottom-color: var(--blue-dark);
+  color: #fff;
+  width: 100%;
+}
+
+.hf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.hf-btn {
+  padding: 20px 10px;
+  font-size: 1rem;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 84px;
+}
+
+.hf-btn .hf-btn-icon {
+  font-size: 1.6rem;
+}
+
+.hf-btn.russian { background: var(--blue-soft); border-bottom-color: var(--blue-dark); color: var(--blue-dark); }
+.hf-btn.slow { background: var(--bg-soft); }
+.hf-btn.translate { background: var(--green-soft); border-bottom-color: var(--green-dark); color: var(--green-dark); }
+.hf-btn.next { background: var(--yellow); border-bottom-color: var(--yellow-dark); color: #5a4400; grid-column: 1 / -1; }
+
+.hf-remote-map {
+  width: 100%;
+  background: var(--bg-soft);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.hf-remote-map strong {
+  color: var(--text);
+}
+
+.hf-toggle-row {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 10px;
+}
+
+.hf-mode-link {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--blue-dark);
+  text-decoration: underline;
+}

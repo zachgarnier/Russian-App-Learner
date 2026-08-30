@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Hands-free Listening — Russian</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <div class="app-header">
+      <a class="back-btn" href="listening.html">←</a>
+      <div>
+        <h1>Hands-free Mode</h1>
+        <div class="subtitle">Control it from your Shokz buttons</div>
+      </div>
+    </div>
+
+    <div class="hf-progress" id="hf-progress">Card — / —</div>
+
+    <!-- Pre-start screen: needs one tap to unlock audio (browser rule) -->
+    <div class="hf-stage" id="hf-prestart">
+      <div class="hf-orb">🎧</div>
+      <div class="hf-status">Ready when you are</div>
+      <div class="hf-substatus">
+        Tap start once, then put your phone away — your Shokz buttons take over from here.
+      </div>
+      <button class="pill-btn hf-start-btn" id="hf-start-btn">▶️ Start hands-free session</button>
+    </div>
+
+    <!-- Live session screen -->
+    <div class="hf-stage" id="hf-live" style="display:none;">
+      <div class="hf-orb" id="hf-orb">🇷🇺</div>
+      <div class="hf-status" id="hf-status">Ready</div>
+
+      <div class="hf-grid">
+        <button class="pill-btn hf-btn russian" id="hf-btn-russian">
+          <span class="hf-btn-icon">🔊</span> Russian
+        </button>
+        <button class="pill-btn hf-btn slow" id="hf-btn-slow">
+          <span class="hf-btn-icon">🐢</span> Slow Russian
+        </button>
+        <button class="pill-btn hf-btn translate" id="hf-btn-translate">
+          <span class="hf-btn-icon">🇬🇧</span> Translation
+        </button>
+        <button class="pill-btn hf-btn next" id="hf-btn-next">
+          <span class="hf-btn-icon">⏭️</span> Next sentence
+        </button>
+      </div>
+
+      <div class="hf-remote-map">
+        <strong>Shokz remote mapping:</strong><br />
+        1 press (play/pause) → 🔊 Russian<br />
+        2 presses (next track) → ⏭️ Next sentence<br />
+        3 presses (previous track) → 🇬🇧 Translation<br />
+        Slow Russian is tap-only for now (see chat for how to remap).
+      </div>
+    </div>
+
+    <!-- Session complete screen -->
+    <div class="complete-screen" id="hf-complete" style="display: none;">
+      <div class="complete-emoji">🎉</div>
+      <h2>Session complete!</h2>
+      <p id="hf-complete-summary">You got through today's sentences.</p>
+      <button class="pill-btn wide bonus-btn" id="hf-bonus-btn">➕ Bonus round (+10)</button>
+      <a class="nav-row-link" href="../index.html">Done for today</a>
+    </div>
+
+    <div class="status-line" id="hf-status-line"></div>
+
+    <audio id="hf-keepalive" src="../audio/silence.mp3" loop preload="auto" playsinline></audio>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/progress.js"></script>
+  <script src="../js/handsfree.js"></script>
+</body>
+</html>
