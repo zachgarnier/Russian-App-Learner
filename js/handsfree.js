@@ -53,6 +53,7 @@ const els = {
 
   statusLine: document.getElementById("hf-status-line"),
   keepAlive: document.getElementById("hf-keepalive"),
+  russianPlayer: document.getElementById("hf-russian-player"),
 };
 
 const VOICES = ["dmitry", "svetlana"];
@@ -129,6 +130,26 @@ function resumeKeepAlive() {
   els.keepAlive.play().catch(() => {
     /* Will resume on the next user-triggered action if this fails. */
   });
+}
+
+// Plays-then-immediately-pauses each persistent <audio> element while
+// still inside the Start button's tap. This is what "unlocks" them on
+// iOS Safari so later, timer-triggered .play() calls on these SAME
+// elements are still allowed to make sound.
+async function unlockAudioElements() {
+  for (const el of [els.keepAlive, els.russianPlayer]) {
+    try {
+      const wasMuted = el.muted;
+      el.muted = true;
+      if (!el.src) el.src = "../audio/silence.mp3";
+      await el.play();
+      el.pause();
+      el.currentTime = 0;
+      el.muted = wasMuted;
+    } catch (err) {
+      console.error("Could not unlock audio element", err);
+    }
+  }
 }
 
 // ---------- Media Session wiring ----------
@@ -280,8 +301,15 @@ async function playRussianClip(slow) {
     }
     setStatusLine("");
 
+    // IMPORTANT (iOS Safari): reuse the SAME <audio> element every time
+    // instead of `new Audio()`. Safari only trusts playback on elements
+    // that were actually play()'d during a real tap; a fresh element
+    // played later from a setTimeout (like our repeat loop) gets
+    // silently muted even though it looks like it's playing. Reusing
+    // the element that was unlocked in the Start button's click handler
+    // keeps every repeat audible.
     const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
+    const audio = els.russianPlayer;
     currentPlaybackAudio = audio;
 
     await new Promise((resolve) => {
@@ -292,13 +320,15 @@ async function playRussianClip(slow) {
       audio.addEventListener("ended", cleanup, { once: true });
       audio.addEventListener("error", cleanup, { once: true });
       audio.addEventListener("pause", cleanup, { once: true }); // covers manual interruption
+      audio.src = url;
+      audio.currentTime = 0;
       audio.play().catch(cleanup);
     });
   } catch (err) {
     console.error(err);
     setStatusLine("Couldn't reach the backend for audio. Check js/config.js / that it's deployed.", true);
   } finally {
-    if (currentPlaybackAudio) currentPlaybackAudio = null;
+    currentPlaybackAudio = null;
     resumeKeepAlive();
   }
 }
@@ -353,13 +383,10 @@ function playTranslation() {
     return;
   }
 
-  const wasAutoPlaying = autoPlaying;
-  // Pause the loop's schedule (without changing the "armed" state) so it
-  // doesn't fire a Russian repeat mid-translation.
-  if (autoLoopTimer) {
-    clearTimeout(autoLoopTimer);
-    autoLoopTimer = null;
-  }
+  // Translation is always a single, one-off play -- it never repeats,
+  // and it doesn't hand back off to the Russian loop afterwards. Press
+  // play again if you want the loop to keep going.
+  stopAutoLoop();
 
   translationInFlight = true;
   setStage("Playing translation…", "🇬🇧");
@@ -372,11 +399,7 @@ function playTranslation() {
   const finish = () => {
     translationInFlight = false;
     resumeKeepAlive();
-    if (wasAutoPlaying && autoPlaying) {
-      scheduleNextLoopIteration(); // pick the repeat loop back up
-    } else {
-      setStage("Ready", "🇷🇺");
-    }
+    setStage("Stopped — press play to resume", "⏸️");
   };
 
   utterance.addEventListener("end", finish, { once: true });
@@ -401,16 +424,13 @@ async function startSession() {
 
   els.prestart.style.display = "none";
 
-  // This play() call happens inside the button's click handler, so it
-  // counts as a "user gesture" and satisfies the browser's autoplay
-  // policy -- required to unlock both the keep-alive audio loop and
-  // speechSynthesis for the rest of the session.
+  // This happens inside the button's click handler, so it counts as a
+  // "user gesture" and satisfies the browser's autoplay policy -- this
+  // unlocks the keep-alive loop, speechSynthesis, and (crucially for
+  // iOS) the persistent Russian audio player for the rest of the session.
   els.keepAlive.volume = 0.01;
-  try {
-    await els.keepAlive.play();
-  } catch (err) {
-    console.error("Could not start keep-alive audio", err);
-  }
+  await unlockAudioElements();
+  resumeKeepAlive();
 
   setupMediaSession();
   const hasCard = loadCurrentCard();
