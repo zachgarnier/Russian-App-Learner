@@ -47,10 +47,6 @@ const els = {
 
   gapInput: document.getElementById("hf-gap-input"),
 
-  complete: document.getElementById("hf-complete"),
-  completeSummary: document.getElementById("hf-complete-summary"),
-  bonusBtn: document.getElementById("hf-bonus-btn"),
-
   statusLine: document.getElementById("hf-status-line"),
   keepAlive: document.getElementById("hf-keepalive"),
   russianPlayer: document.getElementById("hf-russian-player"),
@@ -156,14 +152,12 @@ async function unlockAudioElements() {
 
 function updateMediaSessionMetadata() {
   if (!("mediaSession" in navigator)) return;
-  const session = RuProgress.getSession();
-  const total = session ? session.target : 0;
-  const done = session ? session.completed : 0;
+  const stats = RuProgress.getOverallStats();
   // Deliberately generic (no Russian/English text) so a glance at the
   // lock screen doesn't spoil the answer.
   navigator.mediaSession.metadata = new MediaMetadata({
     title: "Russian Listening Practice",
-    artist: `Card ${Math.min(done + 1, Math.max(total, 1))} of ${total}`,
+    artist: `${stats.success} / ${stats.total} done`,
     album: "Hands-free mode",
   });
 }
@@ -207,43 +201,40 @@ async function loadSentences() {
     .filter((item) => item && typeof item.ru === "string" && item.ru.trim().length > 0)
     .map((item) => ({ ru: item.ru.trim(), en: (item.en || "").trim() }));
 
-  RuProgress.ensureSession(sentences.length, RuProgress.DEFAULT_SESSION_SIZE);
+  if (sentences.length === 0) {
+    throw new Error("No sentences found in sentences.json");
+  }
+
+  RuProgress.setTotalSentences(sentences.length);
 }
 
 // ---------- Card flow ----------
 
 function renderProgress() {
-  const session = RuProgress.getSession();
-  if (!session) {
-    els.progress.textContent = "Card — / —";
-    return;
-  }
-  els.progress.textContent = `Card ${Math.min(session.completed + 1, session.target)} of ${session.target}`;
+  const stats = RuProgress.getOverallStats();
+  els.progress.textContent = `${stats.success.toLocaleString()} / ${stats.total.toLocaleString()} done`;
 }
 
-function loadCurrentCard() {
-  currentIndex = RuProgress.getCurrentCardIndex();
+// Picks a brand new card via the weighted new/failed/success pools (see
+// progress.js) and loads it as the current card. Hands-free mode never
+// grades a card -- advancing past it here doesn't mark it success or
+// failed, it just stays whatever it already was until you actually
+// answer it in the graded Listening Practice exercise.
+function pickAndLoadNewCard() {
+  currentIndex = RuProgress.pickNextIndex(sentences.length);
   renderProgress();
 
-  if (currentIndex === null || RuProgress.isSessionComplete()) {
+  if (currentIndex === null) {
+    // Only possible if there are zero sentences, which loadSentences()
+    // already guards against -- but stop cleanly just in case.
     stopAutoLoop();
-    showComplete();
+    setStatusLine("No sentences available.", true);
     return false;
   }
 
   els.live.style.display = "flex";
-  els.complete.style.display = "none";
   updateMediaSessionMetadata();
   return true;
-}
-
-function showComplete() {
-  els.live.style.display = "none";
-  els.complete.style.display = "flex";
-  const session = RuProgress.getSession();
-  els.completeSummary.textContent = `You got through ${session ? session.completed : 0} sentence${
-    session && session.completed === 1 ? "" : "s"
-  } today.`;
 }
 
 // Stops any in-flight/scheduled Russian playback without touching
@@ -274,11 +265,11 @@ function goNext() {
   // actually scheduled) until the user manually stops/starts it.
   autoPlaying = false;
   haltPlayback();
-  // Hands-free "next" is a plain advance, not a graded answer -- it
-  // counts as "reviewed" for the spaced-repetition queue. Use the
-  // graded swipe mode in regular Listening Practice for know/don't-know.
-  RuProgress.recordAnswer(currentIndex, true);
-  const hasCard = loadCurrentCard();
+  // Hands-free "next" is a plain advance -- it is NOT a graded answer.
+  // Since you can't say yes/no with your hands-free, this sentence's
+  // state is left untouched (still "new" if it was new); only the
+  // swipe-based Listening Practice exercise marks things success/failed.
+  const hasCard = pickAndLoadNewCard();
   if (hasCard) startAutoLoop(); // per your request: next always starts playing immediately
 }
 
@@ -462,7 +453,7 @@ async function startSession() {
   resumeKeepAlive();
 
   setupMediaSession();
-  const hasCard = loadCurrentCard();
+  const hasCard = pickAndLoadNewCard();
   if (hasCard) startAutoLoop(); // clicking Start = clicking play
 }
 
@@ -483,10 +474,6 @@ els.btnSlow.addEventListener("click", () => {
 });
 els.btnTranslate.addEventListener("click", () => playTranslation());
 els.btnNext.addEventListener("click", () => goNext());
-els.bonusBtn.addEventListener("click", () => {
-  RuProgress.extendSession(10);
-  loadCurrentCard();
-});
 
 if (els.gapInput) {
   els.gapInput.addEventListener("change", () => {

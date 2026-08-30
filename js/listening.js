@@ -1,19 +1,14 @@
 // listening.js
 //
-// Drives the listening exercise: loads data/sentences.json, builds the
-// day's spaced-repetition queue via progress.js, and lets the person
-// swipe right ("I know it") or left ("Again") on each card. Audio for
-// a card is generated once (random voice) and cached in memory for the
-// rest of the session -- replaying the same card is instant.
-
-const RING_RADIUS = 34;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+// Drives the listening exercise: loads data/sentences.json, and lets
+// the person swipe right ("I know it") or left ("Again") on each card,
+// picked via progress.js's simple 70/20/10 weighted odds (see
+// progress.js for the model -- no more streaks or daily target).
+// Audio for a card is generated once (random voice) and cached in
+// memory for the rest of the session -- replaying the same card is
+// instant.
 
 const els = {
-  streakLabel: document.getElementById("streak-label"),
-  ringFill: document.getElementById("ring-fill"),
-  ringCount: document.getElementById("ring-count"),
-  ringTarget: document.getElementById("ring-target"),
   overallFill: document.getElementById("overall-fill"),
   overallLabel: document.getElementById("overall-label"),
 
@@ -28,13 +23,6 @@ const els = {
   revealBox: document.getElementById("reveal-box"),
 
   statusLine: document.getElementById("status-line"),
-
-  completeScreen: document.getElementById("complete-screen"),
-  completeSummary: document.getElementById("complete-summary"),
-  completeStreak: document.getElementById("complete-streak"),
-  completeMastered: document.getElementById("complete-mastered"),
-  completePct: document.getElementById("complete-pct"),
-  bonusBtn: document.getElementById("bonus-btn"),
 };
 
 const VOICES = ["dmitry", "svetlana"];
@@ -67,33 +55,10 @@ function setStatus(message, isError) {
 
 // ---------- Rendering: stats ----------
 
-function renderStreak() {
-  const streak = RuProgress.getStreak();
-  els.streakLabel.textContent = `🔥 ${streak} day${streak === 1 ? "" : "s"} streak`;
-}
-
-function renderRing() {
-  const session = RuProgress.getSession();
-  const completed = session ? Math.min(session.completed, session.target) : 0;
-  const target = session ? session.target : RuProgress.DEFAULT_SESSION_SIZE;
-  const frac = target > 0 ? completed / target : 0;
-
-  els.ringFill.style.strokeDasharray = `${RING_CIRCUMFERENCE}`;
-  els.ringFill.style.strokeDashoffset = `${RING_CIRCUMFERENCE * (1 - frac)}`;
-  els.ringCount.textContent = completed;
-  els.ringTarget.textContent = target;
-}
-
 function renderOverall() {
   const stats = RuProgress.getOverallStats();
   els.overallFill.style.width = `${Math.min(100, stats.pct)}%`;
-  els.overallLabel.textContent = `${stats.mastered.toLocaleString()} / ${stats.total.toLocaleString()} mastered (${stats.pct}%)`;
-}
-
-function renderStats() {
-  renderStreak();
-  renderRing();
-  renderOverall();
+  els.overallLabel.textContent = `${stats.success.toLocaleString()} / ${stats.total.toLocaleString()} done (${stats.pct}%)`;
 }
 
 // ---------- Rendering: card ----------
@@ -130,39 +95,24 @@ function resetCardTransform() {
   els.swipeCard.style.transition = "";
 }
 
-function showCard() {
-  currentIndex = RuProgress.getCurrentCardIndex();
+// Picks a brand new card via the weighted pools and shows it. This is
+// an endless feed now -- there's no daily target to run out of, so
+// this always succeeds as long as at least one sentence exists.
+function showNextCard() {
+  currentIndex = RuProgress.pickNextIndex(sentences.length);
 
-  if (currentIndex === null || RuProgress.isSessionComplete()) {
-    showCompleteScreen();
+  if (currentIndex === null) {
+    setStatus("No sentences available.", true);
     return;
   }
 
   els.deck.style.display = "";
-  els.completeScreen.style.display = "none";
 
   revealed = false;
   renderRevealUI();
   resetCardTransform();
   setStatus("");
-  renderStats();
-}
-
-function showCompleteScreen() {
-  els.deck.style.display = "none";
-  els.completeScreen.style.display = "flex";
-
-  const session = RuProgress.getSession();
-  const stats = RuProgress.getOverallStats();
-
-  els.completeSummary.textContent = `You got ${session ? session.completed : 0} sentence${
-    session && session.completed === 1 ? "" : "s"
-  } today.`;
-  els.completeStreak.textContent = RuProgress.getStreak();
-  els.completeMastered.textContent = stats.mastered.toLocaleString();
-  els.completePct.textContent = `${stats.pct}%`;
-
-  renderStats();
+  renderOverall();
 }
 
 // ---------- Data loading ----------
@@ -186,8 +136,8 @@ async function loadSentences() {
       return;
     }
 
-    RuProgress.ensureSession(sentences.length, RuProgress.DEFAULT_SESSION_SIZE);
-    showCard();
+    RuProgress.setTotalSentences(sentences.length);
+    showNextCard();
   } catch (err) {
     console.error(err);
     setStatus("Could not load sentences.json — check the file exists and you're serving over http(s).", true);
@@ -272,12 +222,16 @@ function commitSwipe(knewIt) {
   els.swipeCard.style.transform = `translate(${flyX}px, -40px) rotate(${rotate}deg)`;
   els.swipeCard.style.opacity = "0";
 
+  // Marks this sentence "success" or "failed". If it was previously
+  // "success" and you just got it wrong, it drops back to "failed" here
+  // -- and since the progress bar is a live count of "success" cards,
+  // that alone is what makes the bar go back down by one.
   RuProgress.recordAnswer(idx, knewIt);
 
   const onDone = () => {
     els.swipeCard.removeEventListener("transitionend", onDone);
     els.swipeCard.style.opacity = "1";
-    showCard();
+    showNextCard();
   };
   els.swipeCard.addEventListener("transitionend", onDone);
 
@@ -357,11 +311,6 @@ els.swipeCard.addEventListener("pointerdown", onPointerDown);
 els.swipeCard.addEventListener("pointermove", onPointerMove);
 els.swipeCard.addEventListener("pointerup", onPointerUp);
 els.swipeCard.addEventListener("pointercancel", onPointerUp);
-
-els.bonusBtn.addEventListener("click", () => {
-  RuProgress.extendSession(10);
-  showCard();
-});
 
 // ---------- Init ----------
 
