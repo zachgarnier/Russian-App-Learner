@@ -266,6 +266,13 @@ function haltPlayback() {
 
 function goNext() {
   if (currentIndex === null) return;
+  // IMPORTANT: fully release the loop (not just its timer/audio) before
+  // trying to restart it below. startAutoLoop() no-ops if autoPlaying is
+  // already true, so if the loop was running when Next was pressed, we
+  // must clear the flag here or the restart is silently swallowed and
+  // the loop is left in a "zombie" state (UI says playing, nothing
+  // actually scheduled) until the user manually stops/starts it.
+  autoPlaying = false;
   haltPlayback();
   // Hands-free "next" is a plain advance, not a graded answer -- it
   // counts as "reviewed" for the spaced-repetition queue. Use the
@@ -313,13 +320,28 @@ async function playRussianClip(slow) {
     currentPlaybackAudio = audio;
 
     await new Promise((resolve) => {
+      // A single guarded cleanup shared by all three events, explicitly
+      // removed from ALL of them the moment any one fires. Previously
+      // each event had its own {once:true} listener, so interrupting a
+      // clip mid-play (e.g. pressing translate while Russian audio was
+      // still talking) fired "pause" and self-removed only that
+      // listener -- the "ended"/"error" listeners from that same call
+      // stayed attached to this shared <audio> element forever,
+      // stacking up with every interruption and firing again (harmlessly
+      // but riskily) on later, unrelated plays.
+      let settled = false;
       const cleanup = () => {
+        if (settled) return;
+        settled = true;
+        audio.removeEventListener("ended", cleanup);
+        audio.removeEventListener("error", cleanup);
+        audio.removeEventListener("pause", cleanup);
         URL.revokeObjectURL(url);
         resolve();
       };
-      audio.addEventListener("ended", cleanup, { once: true });
-      audio.addEventListener("error", cleanup, { once: true });
-      audio.addEventListener("pause", cleanup, { once: true }); // covers manual interruption
+      audio.addEventListener("ended", cleanup);
+      audio.addEventListener("error", cleanup);
+      audio.addEventListener("pause", cleanup); // covers manual interruption
       audio.src = url;
       audio.currentTime = 0;
       audio.play().catch(cleanup);
@@ -383,9 +405,12 @@ function playTranslation() {
     return;
   }
 
-  // Translation is always a single, one-off play -- it never repeats,
-  // and it doesn't hand back off to the Russian loop afterwards. Press
-  // play again if you want the loop to keep going.
+  // Translation is always a single, one-off play -- it never repeats.
+  // Remember whether the loop was running so we can hand playback back
+  // to it once the translation finishes (this was the documented intent
+  // at the top of this file, but it was never actually wired up before,
+  // which is why the loop used to just die and need a manual restart).
+  const wasLooping = autoPlaying;
   stopAutoLoop();
 
   translationInFlight = true;
@@ -399,7 +424,11 @@ function playTranslation() {
   const finish = () => {
     translationInFlight = false;
     resumeKeepAlive();
-    setStage("Stopped — press play to resume", "⏸️");
+    if (wasLooping) {
+      startAutoLoop(); // pick back up where we left off
+    } else {
+      setStage("Stopped — press play to resume", "⏸️");
+    }
   };
 
   utterance.addEventListener("end", finish, { once: true });
