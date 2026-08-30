@@ -53,11 +53,17 @@
 
       <div class="hf-remote-map">
         <strong>Shokz remote mapping:</strong><br />
-        1 press (play/pause) → 🔊 Russian<br />
-        2 presses (next track) → ⏭️ Next sentence<br />
-        3 presses (previous track) → 🇬🇧 Translation<br />
+        1 press (play/pause) → start/stop the Russian repeat loop<br />
+        2 presses (next track) → next sentence, loop starts right away<br />
+        3 presses (previous track) → 🇬🇧 translation, then loop resumes<br />
         Slow Russian is tap-only for now (see chat for how to remap).
       </div>
+
+      <label class="hf-remote-map" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span>Repeat pause (seconds)</span>
+        <input type="number" id="hf-gap-input" min="1" max="30" step="1" value="5"
+          style="width:60px; padding:6px; border-radius:8px; border:2px solid var(--border); font-family:inherit; font-weight:800; text-align:center;" />
+      </label>
     </div>
 
     <!-- Session complete screen -->

@@ -5,17 +5,21 @@
 // Shokz) doing the driving. It uses the standard Web "Media Session API"
 // to receive the headset's play/pause, next-track and previous-track
 // button presses -- the same API every podcast/music PWA uses for lock
-// screen controls. Nothing here is Shokz-specific; it's just three
-// generic Bluetooth remote-control (AVRCP) commands most headsets send:
+// screen controls.
 //
-//   1 press (play/pause) -> play the sentence in Russian
-//   2 presses (next track) -> advance to the next sentence
-//   3 presses (previous track) -> play the English translation
+//   1 press (play/pause) -> toggle the auto-repeating Russian loop
+//                            (plays now, then again every REPEAT_GAP_MS,
+//                            until you press it again to stop)
+//   2 presses (next track) -> advance to the next sentence AND
+//                              immediately start the loop for it
+//   3 presses (previous track) -> play the English translation once,
+//                                  then the loop (if it was running)
+//                                  picks back up where it left off
 //
-// "Slow Russian" only has an on-screen button for now, because most
-// remotes only expose those three commands (see the chat reply for how
-// to add a fourth mapping if your headset supports more).
-//
+// >>> TO CHANGE THE PAUSE BETWEEN REPEATS, edit DEFAULT_REPEAT_GAP_SECONDS
+// >>> below, or use the "Repeat pause" field in the app itself.
+const DEFAULT_REPEAT_GAP_SECONDS = 5;
+
 // Two things make this actually work with the screen off / app
 // backgrounded on a phone:
 //   1. A persistent, silent, looping <audio> element (#hf-keepalive).
@@ -23,7 +27,9 @@
 //      keeping *something* audible-to-the-OS (even at ~0 volume) is what
 //      keeps the tab alive and keeps the remote-control events flowing.
 //   2. navigator.mediaSession.setActionHandler(...) registered once,
-//      kept registered for the whole session.
+//      kept registered for the whole session, with playbackState kept
+//      in sync so the headset's single button correctly toggles between
+//      sending "play" and sending "pause".
 
 const els = {
   progress: document.getElementById("hf-progress"),
@@ -39,6 +45,8 @@ const els = {
   btnTranslate: document.getElementById("hf-btn-translate"),
   btnNext: document.getElementById("hf-btn-next"),
 
+  gapInput: document.getElementById("hf-gap-input"),
+
   complete: document.getElementById("hf-complete"),
   completeSummary: document.getElementById("hf-complete-summary"),
   bonusBtn: document.getElementById("hf-bonus-btn"),
@@ -48,11 +56,18 @@ const els = {
 };
 
 const VOICES = ["dmitry", "svetlana"];
+const GAP_STORAGE_KEY = "ruHandsfreeGapSeconds";
 
 let sentences = [];
 let currentIndex = null;
-let busy = false; // true while audio is generating/playing, to ignore rapid double-presses
-const cardAudioCache = {}; // same shape as listening.js's cache
+let repeatGapMs = DEFAULT_REPEAT_GAP_SECONDS * 1000;
+
+let autoPlaying = false; // is the Russian repeat-loop armed?
+let autoLoopTimer = null; // setTimeout handle for the gap between repeats
+let currentPlaybackAudio = null; // the Audio() currently playing, if any
+let translationInFlight = false;
+
+const cardAudioCache = {}; // cardAudioCache[index] = { voice, blobs: { normal, slow } }
 
 function pickRandomVoice() {
   return VOICES[Math.floor(Math.random() * VOICES.length)];
@@ -75,12 +90,25 @@ function setStage(text, icon) {
   if (icon) els.orb.textContent = icon;
 }
 
-function setBusy(isBusy) {
-  busy = isBusy;
-  els.orb.classList.toggle("active", isBusy);
-  [els.btnRussian, els.btnSlow, els.btnTranslate, els.btnNext].forEach((b) => {
-    b.disabled = isBusy;
-  });
+function updateRussianButtonLabel() {
+  els.btnRussian.innerHTML = autoPlaying
+    ? '<span class="hf-btn-icon">⏹️</span> Stop'
+    : '<span class="hf-btn-icon">🔊</span> Russian';
+}
+
+// ---------- Repeat-gap setting ----------
+
+function loadGapSetting() {
+  const saved = parseFloat(localStorage.getItem(GAP_STORAGE_KEY));
+  const seconds = Number.isFinite(saved) && saved > 0 ? saved : DEFAULT_REPEAT_GAP_SECONDS;
+  repeatGapMs = seconds * 1000;
+  if (els.gapInput) els.gapInput.value = seconds;
+}
+
+function saveGapSetting(seconds) {
+  const clamped = Math.min(30, Math.max(1, seconds || DEFAULT_REPEAT_GAP_SECONDS));
+  repeatGapMs = clamped * 1000;
+  localStorage.setItem(GAP_STORAGE_KEY, String(clamped));
 }
 
 // ---------- Keep-alive loop ----------
@@ -117,7 +145,14 @@ function updateMediaSessionMetadata() {
     artist: `Card ${Math.min(done + 1, Math.max(total, 1))} of ${total}`,
     album: "Hands-free mode",
   });
-  navigator.mediaSession.playbackState = "playing";
+}
+
+function syncMediaSessionPlaybackState() {
+  if (!("mediaSession" in navigator)) return;
+  // This is what lets a single headset button correctly alternate
+  // between sending "play" (when we report "paused") and "pause"
+  // (when we report "playing").
+  navigator.mediaSession.playbackState = autoPlaying ? "playing" : "paused";
 }
 
 function setupMediaSession() {
@@ -130,13 +165,10 @@ function setupMediaSession() {
   }
 
   try {
-    navigator.mediaSession.setActionHandler("play", () => playRussian(false));
+    navigator.mediaSession.setActionHandler("play", () => startAutoLoop());
+    navigator.mediaSession.setActionHandler("pause", () => stopAutoLoop());
     navigator.mediaSession.setActionHandler("nexttrack", () => goNext());
     navigator.mediaSession.setActionHandler("previoustrack", () => playTranslation());
-    // "pause" fires if the remote is pressed while our keep-alive audio is
-    // reported as playing. We just treat it the same as "play" (replay
-    // the current sentence) so an accidental double-tap doesn't do nothing.
-    navigator.mediaSession.setActionHandler("pause", () => playRussian(false));
   } catch (err) {
     console.error("MediaSession action handlers not fully supported", err);
   }
@@ -173,14 +205,15 @@ function loadCurrentCard() {
   renderProgress();
 
   if (currentIndex === null || RuProgress.isSessionComplete()) {
+    stopAutoLoop();
     showComplete();
-    return;
+    return false;
   }
 
   els.live.style.display = "flex";
   els.complete.style.display = "none";
-  setStage("Ready — press play on your headset", "🇷🇺");
   updateMediaSessionMetadata();
+  return true;
 }
 
 function showComplete() {
@@ -192,28 +225,39 @@ function showComplete() {
   } today.`;
 }
 
+// Stops any in-flight/scheduled Russian playback without touching
+// autoPlaying's target state -- used internally before switching cards
+// or playing a one-off (slow / translation).
+function haltPlayback() {
+  if (autoLoopTimer) {
+    clearTimeout(autoLoopTimer);
+    autoLoopTimer = null;
+  }
+  if (currentPlaybackAudio) {
+    try {
+      currentPlaybackAudio.pause();
+    } catch (e) {
+      /* ignore */
+    }
+    currentPlaybackAudio = null;
+  }
+}
+
 function goNext() {
-  if (currentIndex === null || busy) return;
-  // Hands-free "next" is a plain advance, not a graded answer -- it counts
-  // as "reviewed" for the spaced-repetition queue. If you want to mark a
-  // card as NOT known instead, use the graded swipe mode in the regular
-  // Listening Practice screen.
+  if (currentIndex === null) return;
+  haltPlayback();
+  // Hands-free "next" is a plain advance, not a graded answer -- it
+  // counts as "reviewed" for the spaced-repetition queue. Use the
+  // graded swipe mode in regular Listening Practice for know/don't-know.
   RuProgress.recordAnswer(currentIndex, true);
-  loadCurrentCard();
+  const hasCard = loadCurrentCard();
+  if (hasCard) startAutoLoop(); // per your request: next always starts playing immediately
 }
 
-// ---------- Audio: Russian (backend TTS, cached) ----------
+// ---------- Audio: Russian (backend TTS, cached), single play ----------
 
-function playBlob(blob) {
-  const url = URL.createObjectURL(blob);
-  const audio = new Audio(url);
-  audio.addEventListener("ended", () => URL.revokeObjectURL(url));
-  audio.addEventListener("error", () => URL.revokeObjectURL(url));
-  return { audio, playPromise: audio.play() };
-}
-
-async function playRussian(slow) {
-  if (currentIndex === null || busy) return;
+async function playRussianClip(slow) {
+  if (currentIndex === null) return;
   const idx = currentIndex;
   const current = sentences[idx];
   if (!current) return;
@@ -221,7 +265,6 @@ async function playRussian(slow) {
   const entry = getOrCreateAudioEntry(idx);
   const cacheKey = slow ? "slow" : "normal";
 
-  setBusy(true);
   setStage(slow ? "Playing slow Russian…" : "Playing Russian…", "🔊");
   pauseKeepAlive();
 
@@ -236,27 +279,72 @@ async function playRussian(slow) {
       entry.blobs[cacheKey] = blob;
     }
     setStatusLine("");
-    const { audio, playPromise } = playBlob(blob);
-    await playPromise;
+
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentPlaybackAudio = audio;
+
     await new Promise((resolve) => {
-      audio.addEventListener("ended", resolve, { once: true });
-      audio.addEventListener("error", resolve, { once: true });
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      audio.addEventListener("ended", cleanup, { once: true });
+      audio.addEventListener("error", cleanup, { once: true });
+      audio.addEventListener("pause", cleanup, { once: true }); // covers manual interruption
+      audio.play().catch(cleanup);
     });
   } catch (err) {
     console.error(err);
     setStatusLine("Couldn't reach the backend for audio. Check js/config.js / that it's deployed.", true);
   } finally {
-    setStage("Ready", "🇷🇺");
-    setBusy(false);
+    if (currentPlaybackAudio) currentPlaybackAudio = null;
     resumeKeepAlive();
-    updateMediaSessionMetadata();
   }
+}
+
+// ---------- Auto-repeat loop ----------
+
+function scheduleNextLoopIteration() {
+  if (!autoPlaying) return;
+  setStage(`Repeating in ${Math.round(repeatGapMs / 1000)}s…`, "⏳");
+  autoLoopTimer = setTimeout(async () => {
+    autoLoopTimer = null;
+    if (!autoPlaying) return;
+    await playRussianClip(false);
+    if (autoPlaying) {
+      setStage("Playing Russian…", "🔊"); // brief settle before next schedule call overwrites it
+      scheduleNextLoopIteration();
+    }
+  }, repeatGapMs);
+}
+
+async function startAutoLoop() {
+  if (autoPlaying) return; // already running, ignore duplicate "play"
+  autoPlaying = true;
+  syncMediaSessionPlaybackState();
+  updateRussianButtonLabel();
+  await playRussianClip(false);
+  if (autoPlaying) scheduleNextLoopIteration();
+}
+
+function stopAutoLoop() {
+  autoPlaying = false;
+  haltPlayback();
+  syncMediaSessionPlaybackState();
+  updateRussianButtonLabel();
+  setStage("Stopped — press play to resume", "⏸️");
+}
+
+function toggleAutoLoop() {
+  if (autoPlaying) stopAutoLoop();
+  else startAutoLoop();
 }
 
 // ---------- Audio: English translation (on-device speech synthesis) ----------
 
 function playTranslation() {
-  if (currentIndex === null || busy) return;
+  if (currentIndex === null || translationInFlight) return;
   const current = sentences[currentIndex];
   if (!current || !current.en) return;
 
@@ -265,7 +353,15 @@ function playTranslation() {
     return;
   }
 
-  setBusy(true);
+  const wasAutoPlaying = autoPlaying;
+  // Pause the loop's schedule (without changing the "armed" state) so it
+  // doesn't fire a Russian repeat mid-translation.
+  if (autoLoopTimer) {
+    clearTimeout(autoLoopTimer);
+    autoLoopTimer = null;
+  }
+
+  translationInFlight = true;
   setStage("Playing translation…", "🇬🇧");
   pauseKeepAlive();
 
@@ -274,10 +370,13 @@ function playTranslation() {
   utterance.rate = 1;
 
   const finish = () => {
-    setStage("Ready", "🇷🇺");
-    setBusy(false);
+    translationInFlight = false;
     resumeKeepAlive();
-    updateMediaSessionMetadata();
+    if (wasAutoPlaying && autoPlaying) {
+      scheduleNextLoopIteration(); // pick the repeat loop back up
+    } else {
+      setStage("Ready", "🇷🇺");
+    }
   };
 
   utterance.addEventListener("end", finish, { once: true });
@@ -314,17 +413,34 @@ async function startSession() {
   }
 
   setupMediaSession();
-  loadCurrentCard();
+  const hasCard = loadCurrentCard();
+  if (hasCard) startAutoLoop(); // clicking Start = clicking play
 }
 
 // ---------- Event wiring ----------
 
+loadGapSetting();
+
 els.startBtn.addEventListener("click", startSession);
-els.btnRussian.addEventListener("click", () => playRussian(false));
-els.btnSlow.addEventListener("click", () => playRussian(true));
+els.btnRussian.addEventListener("click", toggleAutoLoop);
+els.btnSlow.addEventListener("click", () => {
+  if (autoLoopTimer) {
+    clearTimeout(autoLoopTimer);
+    autoLoopTimer = null;
+  }
+  playRussianClip(true).then(() => {
+    if (autoPlaying) scheduleNextLoopIteration();
+  });
+});
 els.btnTranslate.addEventListener("click", () => playTranslation());
 els.btnNext.addEventListener("click", () => goNext());
 els.bonusBtn.addEventListener("click", () => {
   RuProgress.extendSession(10);
   loadCurrentCard();
 });
+
+if (els.gapInput) {
+  els.gapInput.addEventListener("change", () => {
+    saveGapSetting(parseFloat(els.gapInput.value));
+  });
+}
